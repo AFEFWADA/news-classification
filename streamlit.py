@@ -11,12 +11,42 @@ import itertools
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
+import os
+from tensorflow.keras.models import load_model
+
 # ==========================
-# 1️⃣ Load Saved Models
+# 1️⃣ Helper function to safely load files
 # ==========================
-tfidf_vectorizer = joblib.load("tfidf_vectorizer.pkl")
-svc_model = joblib.load("linear_svc_model.pkl")
-bilstm_model = load_model("guardian_bilstm_model.h5")
+def safe_load_joblib(file_path):
+    if not os.path.exists(file_path):
+        st.error(f"❌ File not found: {file_path}. Make sure it exists in your app directory.")
+        st.stop()
+    return joblib.load(file_path)
+
+def safe_load_pickle(file_path):
+    if not os.path.exists(file_path):
+        st.error(f"❌ File not found: {file_path}. Make sure it exists in your app directory.")
+        st.stop()
+    with open(file_path, "rb") as f:
+        return pickle.load(f)
+
+def safe_load_keras_model(file_path):
+    if not os.path.exists(file_path):
+        st.error(f"❌ Model file not found: {file_path}. Make sure it exists in your app directory.")
+        st.stop()
+    return load_model(file_path)
+
+# ==========================
+# 2️⃣ Load your models safely
+# ==========================
+tfidf_vectorizer = safe_load_joblib("tfidf_vectorizer.pkl")
+svc_model = safe_load_joblib("linear_svc_model.pkl")
+bilstm_model = safe_load_keras_model("guardian_bilstm_model.h5")
+tokenizer = safe_load_pickle("tokenizer.pkl")
+le = safe_load_pickle("label_encoder.pkl")
+
+st.success("✅ All models and files loaded successfully!")
+
 
 with open("tokenizer.pkl", "rb") as f:
     tokenizer = pickle.load(f)
