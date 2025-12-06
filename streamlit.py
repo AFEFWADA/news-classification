@@ -6,16 +6,14 @@ import re
 import matplotlib.pyplot as plt
 import matplotlib
 import itertools
+import os
 
 # TensorFlow / Keras
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-import os
-from tensorflow.keras.models import load_model
-
 # ==========================
-# 1️⃣ Helper function to safely load files
+# 1️⃣ Helper functions to safely load files
 # ==========================
 def safe_load_joblib(file_path):
     if not os.path.exists(file_path):
@@ -37,7 +35,7 @@ def safe_load_keras_model(file_path):
     return load_model(file_path)
 
 # ==========================
-# 2️⃣ Load your models safely
+# 2️⃣ Load models safely
 # ==========================
 tfidf_vectorizer = safe_load_joblib("tfidf_vectorizer.pkl")
 svc_model = safe_load_joblib("linear_svc_model.pkl")
@@ -47,23 +45,16 @@ le = safe_load_pickle("label_encoder.pkl")
 
 st.success("✅ All models and files loaded successfully!")
 
-
-with open("tokenizer.pkl", "rb") as f:
-    tokenizer = pickle.load(f)
-
-with open("label_encoder.pkl", "rb") as f:
-    le = pickle.load(f)
-
 MAX_LEN = 400  # must match training
 
-# Load saved metrics
+# Saved metrics
 ML_TEST_ACCURACY = 0.7365
 ML_TEST_F1 = 0.7301
 DL_TEST_ACCURACY = 0.7139
 DL_TEST_F1 = 0.7033
 
 # ==========================
-# 2️⃣ Text Preprocessing
+# 3️⃣ Text preprocessing
 # ==========================
 import nltk
 from nltk.corpus import stopwords
@@ -95,7 +86,7 @@ def clean_text(text):
     return " ".join(cleaned)
 
 # ==========================
-# 3️⃣ Prediction Function
+# 4️⃣ Prediction function
 # ==========================
 def predict_news(text):
     processed = clean_text(text)
@@ -104,11 +95,11 @@ def predict_news(text):
     tfidf_input = tfidf_vectorizer.transform([processed])
     ml_pred = svc_model.predict(tfidf_input)[0]
 
-    # ML "probabilities" using decision function (normalized to 0-1)
+    # ML probabilities
     try:
         ml_decision = svc_model.decision_function(tfidf_input)
         if len(ml_decision.shape) == 1:  # binary
-            ml_probs = 1 / (1 + np.exp(-ml_decision))  # sigmoid
+            ml_probs = 1 / (1 + np.exp(-ml_decision))
             ml_probs_full = np.array([1 - ml_probs[0], ml_probs[0]])
         else:
             ml_probs = np.exp(ml_decision) / np.sum(np.exp(ml_decision))
@@ -116,10 +107,10 @@ def predict_news(text):
     except:
         ml_probs_full = np.zeros(len(le.classes_))
 
-    # DL Prediction + Probabilities
+    # DL Prediction
     seq = pad_sequences(tokenizer.texts_to_sequences([processed]),
                         maxlen=MAX_LEN, padding="post")
-    probs = bilstm_model.predict(seq)[0]  # DL probabilities
+    probs = bilstm_model.predict(seq)[0]
     dl_pred_idx = np.argmax(probs)
     dl_pred = le.inverse_transform([dl_pred_idx])[0]
 
@@ -136,7 +127,7 @@ def predict_news(text):
     }
 
 # ==========================
-# 4️⃣ Streamlit UI
+# 5️⃣ Streamlit UI
 # ==========================
 st.title("📰 News Classification (ML + Deep Learning)")
 st.write("Enter a news article and get ML & DL predictions with accuracy scores and confidence visualization.")
@@ -153,17 +144,13 @@ if st.button("🚀 Predict"):
         dl_probs = result["dl_probabilities"]
         ml_probs = result["ml_probabilities"]
         categories = le.classes_
-        base_colors = plt.cm.tab20.colors  # define once
+        base_colors = plt.cm.tab20.colors
 
-        # --------------------------
-        # Processed Text
-        # --------------------------
+        # Processed text
         st.subheader("🧹 Processed Text")
         st.code(result["processed_text"])
 
-        # --------------------------
         # ML & DL Predictions
-        # --------------------------
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("🤖 ML Prediction (LinearSVC)")
@@ -176,25 +163,18 @@ if st.button("🚀 Predict"):
             st.write(f"**Accuracy:** {result['dl_test_accuracy']:.4f}")
             st.write(f"**F1-Score:** {result['dl_test_f1']:.4f}")
 
-        # --------------------------
-        # Colored Labels
-        # --------------------------
+        # DL probabilities with colors
         st.subheader("🔹 DL Probabilities with Labels")
         color_cycle = itertools.cycle(base_colors)
         for i in range(len(dl_probs)):
-            if dl_probs[i] > 0:  # only show non-zero probabilities
+            if dl_probs[i] > 0:
                 color = matplotlib.colors.rgb2hex(next(color_cycle))
                 st.markdown(f"<span style='color:{color};'>● {categories[i]}: {dl_probs[i]*100:.1f}%</span>",
                             unsafe_allow_html=True)
 
-        # --------------------------
-        # Line Chart for DL & ML Probabilities
-        # --------------------------
+        # Line chart
         st.subheader("📈 ML + DL Probabilities (Line Chart)")
-
         fig_line, ax_line = plt.subplots(figsize=(10, 4))
-
-        # Only show non-zero DL probabilities
         non_zero_indices = [i for i, p in enumerate(dl_probs) if p > 0]
         non_zero_dl_probs = [dl_probs[i] for i in non_zero_indices]
         non_zero_ml_probs = [ml_probs[i] for i in non_zero_indices]
